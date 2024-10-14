@@ -1,48 +1,97 @@
-// use this to decode a token and get the user's information out of it
 import decode from 'jwt-decode';
+import { gql } from '@apollo/client';
 
 // create a new class to instantiate for a user
 class AuthService {
-  // get user data
+  // get user data from token
   getProfile() {
     return decode(this.getToken());
   }
 
   // check if user's logged in
   loggedIn() {
-    // Checks if there is a saved token and it's still valid
     const token = this.getToken();
-    return !!token && !this.isTokenExpired(token); // handwaiving here
+    return !!token && !this.isTokenExpired(token);
   }
 
   // check if token is expired
   isTokenExpired(token) {
     try {
       const decoded = decode(token);
-      if (decoded.exp < Date.now() / 1000) {
-        return true;
-      } else return false;
+      return decoded.exp < Date.now() / 1000;
     } catch (err) {
       return false;
     }
   }
 
+  // Retrieves the user token from localStorage
   getToken() {
-    // Retrieves the user token from localStorage
     return localStorage.getItem('id_token');
   }
 
+  // Save token to localStorage and log the user in
   login(idToken) {
-    // Saves user token to localStorage
     localStorage.setItem('id_token', idToken);
     window.location.assign('/');
   }
 
+  // Logout user and clear token from localStorage
   logout() {
-    // Clear user token and profile data from localStorage
     localStorage.removeItem('id_token');
-    // this will reload the page and reset the state of the application
     window.location.assign('/');
+  }
+
+  // Login mutation with GraphQL
+  async loginUser(email, password) {
+    const LOGIN_USER = gql`
+      mutation loginUser($email: String!, $password: String!) {
+        loginUser(email: $email, password: $password) {
+          token
+          user {
+            _id
+            email
+          }
+        }
+      }
+    `;
+
+    try {
+      const { data } = await client.mutate({
+        mutation: LOGIN_USER,
+        variables: { email, password },
+      });
+      
+      const { token } = data.loginUser;
+      this.login(token); // Save token to localStorage
+      return data.loginUser;
+    } catch (error) {
+      console.error("Login failed:", error);
+      return null;
+    }
+  }
+
+  // Example query to check if the user is authenticated using token in localStorage
+  async getMe() {
+    const GET_ME = gql`
+      query getMe {
+        me {
+          _id
+          email
+          name
+        }
+      }
+    `;
+
+    try {
+      const { data } = await client.query({
+        query: GET_ME,
+      });
+
+      return data.me;
+    } catch (error) {
+      console.error("Fetching user info failed:", error);
+      return null;
+    }
   }
 }
 
