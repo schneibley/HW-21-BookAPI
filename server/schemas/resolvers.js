@@ -55,7 +55,13 @@ const resolvers = {
         return updatedUser;
       }
       throw new Error('You need to be logged in!');
+    },
+    addUser: async (_parent, args) => {
+      const user = await User.create(args);
+      const token = signToken(user);
+      return { token, user };
     }
+  }
   }
 };
 
